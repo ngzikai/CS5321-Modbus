@@ -6,14 +6,71 @@ import java.security.KeyPairGenerator;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import javax.crypto.KeyAgreement;
+import javax.crypto.Cipher;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.IvParameterSpec;
+import javax.xml.bind.DatatypeConverter;
+
 
 public class BobServer {
 	public static void main(String args[]) throws Exception {
 		byte[] sharedSecret = generateKey();
 		
 		System.out.println("Shared Secret: " + toHexString(sharedSecret));
+
+		connectHmi(sharedSecret);
+	}
+
+	public static void connectHmi(byte[] sharedSecret){
+		try{
+			ServerSocket plcServer = new ServerSocket(5556);
+			Socket plcSocket = plcServer.accept();
+			Socket aliceSocket = new Socket("localhost", 1234);
+
+			String aliceMessage = "";
+			String plcMessage = "";
+
+			byte[] decodedHex;
+
+			BufferedReader aliceIn = new BufferedReader(new InputStreamReader(aliceSocket.getInputStream()));
+			PrintWriter aliceOut = new PrintWriter(aliceSocket.getOutputStream(), true);
+			BufferedReader plcIn = new BufferedReader(new InputStreamReader(plcSocket.getInputStream()));
+			PrintWriter plcOut = new PrintWriter(plcSocket.getOutputStream(), true);
+        	
+        	byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    		IvParameterSpec ivspec = new IvParameterSpec(iv);
+        	SecretKeySpec bobAesKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
+			Cipher bobCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			bobCipher.init(Cipher.DECRYPT_MODE, bobAesKey, ivspec);
+
+
+			while (true) {
+				if ((aliceMessage = aliceIn.readLine()) != null){
+					decodedHex = DatatypeConverter.parseHexBinary(aliceMessage);
+					byte[] recovered = bobCipher.doFinal(decodedHex);
+					String recoveredString = new String(recovered, "UTF-8");
+					plcOut.println(recoveredString);
+
+				}
+				/**
+				else if ((plcMessage = plcIn.readLine()) != null){
+					aliceOut.println(plcMessage);
+					System.out.println("plc: " + plcMessage);
+				} 
+				**/
+				else {
+					break;
+				}
+			}
+			
+			aliceSocket.close();
+			plcSocket.close();
+		} catch (Exception e) {
+			System.out.println(e);
+		}
+
 	}
 	
 	public static byte[] generateKey() {
@@ -80,6 +137,7 @@ public class BobServer {
 			 */
 
 			byte[] bobSharedSecret = bobKeyAgree.generateSecret();
+			clientSocket.close();
 			
 			return bobSharedSecret;
 			
@@ -87,6 +145,7 @@ public class BobServer {
 			System.out.println("Error Generating Shared Secret!");
 			return null;
 		}
+
 	}
 	
     /*
@@ -105,6 +164,18 @@ public class BobServer {
      * Converts a byte array to hex string
      */
     private static String toHexString(byte[] block) {
+        StringBuffer buf = new StringBuffer();
+        int len = block.length;
+        for (int i = 0; i < len; i++) {
+            byte2hex(block[i], buf);
+            if (i < len-1) {
+                buf.append(":");
+            }
+        }
+        return buf.toString();
+    }
+
+    private static String stringToHex(byte[] block) {
         StringBuffer buf = new StringBuffer();
         int len = block.length;
         for (int i = 0; i < len; i++) {

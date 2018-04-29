@@ -6,16 +6,70 @@ import java.security.KeyPairGenerator;
 import java.security.PublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import javax.crypto.KeyAgreement;
+import javax.crypto.Cipher;
 import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.spec.IvParameterSpec;
+import javax.xml.bind.DatatypeConverter;
 
 public class AliceServer {
+
 	public static void main(String[] args) throws Exception {
 		
 		byte[] sharedSecret = generateKey();
-		
 		System.out.println("Shared Secret: " + toHexString(sharedSecret));
+	
+		sendApc(sharedSecret);
 	}
+	
+	public static void sendApc(byte[] sharedSecret){
+		try {
+			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    		IvParameterSpec ivspec = new IvParameterSpec(iv);
+			SecretKeySpec aliceAesKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
+			Cipher aliceCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			aliceCipher.init(Cipher.ENCRYPT_MODE, aliceAesKey, ivspec);
+
+			ServerSocket hmiServer = new ServerSocket(5555);
+			ServerSocket bobServer = new ServerSocket(1234);
+
+			Socket hmiSocket = hmiServer.accept();
+			Socket bobSocket = bobServer.accept();
+
+			String hmiMessage = "";
+			String bobMessage = "";
+
+			String hexCipher = "";
+
+			BufferedReader hmiIn = new BufferedReader(new InputStreamReader(hmiSocket.getInputStream()));
+			PrintWriter hmiOut = new PrintWriter(hmiSocket.getOutputStream(), true);
+			BufferedReader bobIn = new BufferedReader(new InputStreamReader(bobSocket.getInputStream()));
+			PrintWriter bobOut = new PrintWriter(bobSocket.getOutputStream(), true);
+
+			while (true) {
+				/**
+				if ((bobMessage = bobIn.readLine()) != null){
+					hmiOut.println(bobMessage);
+					System.out.println("bob: " + bobMessage);
+				}
+				**/
+				if ((hmiMessage = hmiIn.readLine()) != null){
+					byte[] ciphertext = aliceCipher.doFinal(hmiMessage.getBytes());
+					hexCipher = DatatypeConverter.printHexBinary(ciphertext);
+					bobOut.println(hexCipher);	
+				} else {
+					break;
+				}
+			}
+
+			hmiSocket.close();
+			bobSocket.close();
+		} catch (Exception e){
+			System.out.println(e);
+		}
+	}
+	
 
 	private static byte[] generateKey() {
 		/*
@@ -35,9 +89,9 @@ public class AliceServer {
 			// Alice encodes her public key, and sends it over to Bob.
 			byte[] alicePubKeyEnc = aliceKpair.getPublic().getEncoded();
 
-			ServerSocket serverSocket = new ServerSocket(1234);
+			ServerSocket bobServer = new ServerSocket(1234);
 
-			Socket connectionSocket = serverSocket.accept();
+			Socket connectionSocket = bobServer.accept();
 
 			if (connectionSocket != null) {
 				System.out.println("Accepted Bob at " + connectionSocket.getInetAddress());
@@ -76,6 +130,7 @@ public class AliceServer {
 			 */
 			byte[] aliceSharedSecret = aliceKeyAgree.generateSecret();
 			
+			bobServer.close();
 			return aliceSharedSecret;
 		} catch (Exception e) {
 			System.out.println("Error Generating Shared Secret");
