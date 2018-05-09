@@ -13,11 +13,12 @@ import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.spec.IvParameterSpec;
 
 public class AliceServer {
+	private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
 	public static void main(String[] args) throws Exception {
 		
 		byte[] sharedSecret = generateKey();
-		System.out.println("Shared Secret: " + toHexString(sharedSecret));
+		System.out.println("Shared Secret: " + bytesToHex(sharedSecret));
 	
 		sendApc(sharedSecret);
 	}
@@ -55,11 +56,7 @@ public class AliceServer {
 				**/
 				if ((hmiMessage = hmiIn.readLine()) != null){
 					byte[] ciphertext = aliceCipher.doFinal(hmiMessage.getBytes());
-					StringBuilder sb = new StringBuilder();
-                    for (byte b: ciphertext){
-                        sb.append(String.format("%02X",b));
-                    }
-                    hexCipher = sb.toString();
+					hexCipher = bytesToHex(ciphertext); 
 					bobOut.println(hexCipher);	
 				} else {
 					break;
@@ -166,5 +163,15 @@ public class AliceServer {
 			}
 		}
 		return buf.toString();
+	}
+
+	public static String bytesToHex(byte[] bytes) {
+	    char[] hexChars = new char[bytes.length * 2];
+	    for ( int j = 0; j < bytes.length; j++ ) {
+	        int v = bytes[j] & 0xFF;
+	        hexChars[j * 2] = hexArray[v >>> 4];
+	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+	    }
+	    return new String(hexChars);
 	}
 }
