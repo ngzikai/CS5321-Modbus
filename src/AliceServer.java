@@ -11,7 +11,6 @@ import javax.crypto.interfaces.DHPublicKey;
 import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.spec.IvParameterSpec;
-import javax.xml.bind.DatatypeConverter;
 
 public class AliceServer {
 
@@ -56,7 +55,11 @@ public class AliceServer {
 				**/
 				if ((hmiMessage = hmiIn.readLine()) != null){
 					byte[] ciphertext = aliceCipher.doFinal(hmiMessage.getBytes());
-					hexCipher = DatatypeConverter.printHexBinary(ciphertext);
+					StringBuilder sb = new StringBuilder();
+                    for (byte b: ciphertext){
+                        sb.append(String.format("%02X",b));
+                    }
+                    hexCipher = sb.toString();
 					bobOut.println(hexCipher);	
 				} else {
 					break;
