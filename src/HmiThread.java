@@ -90,12 +90,6 @@ class HmiServer extends Thread{
 			Cipher aliceCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			aliceCipher.init(Cipher.ENCRYPT_MODE, aliceAesKey, ivspec);
 
-			// ServerSocket hmiServer = new ServerSocket(5555);
-			// ServerSocket slaveServer = new ServerSocket(1234);
-
-			// Socket hmiSocket = hmiServer.accept();
-			// Socket slaveSocket = slaveServer.accept();
-
 			String hmiMessage = "";
 			String hexCipher = "";
 
