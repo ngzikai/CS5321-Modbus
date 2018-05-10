@@ -12,7 +12,7 @@ import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.spec.IvParameterSpec;
 
-public class BobServer {
+public class SlaveServer {
 	private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
 
 	public static void main(String args[]) throws Exception {

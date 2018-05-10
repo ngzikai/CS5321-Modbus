@@ -12,15 +12,72 @@ import javax.crypto.spec.DHParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.crypto.spec.IvParameterSpec;
 
-public class AliceServer {
+class HmiServer extends Thread{
 	private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
+	private Thread t;
+	private String threadName;
 
-	public static void main(String[] args) throws Exception {
+	HmiServer(String name) {
+		threadName = name;
+		System.out.println("Creating " + threadName);
+	}
+
+	public void run(){
 		
 		byte[] sharedSecret = generateKey();
 		System.out.println("Shared Secret: " + bytesToHex(sharedSecret));
 	
 		sendApc(sharedSecret);
+	}
+
+	public void start() {
+		System.out.println("Starting " + threadName);
+		if (t == null){
+			t = new Thread (this, threadName);
+			t.start();
+		}
+	}
+
+	public static void receiveSlave(byte[] sharedSecret) {
+		try {
+			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+    		IvParameterSpec ivspec = new IvParameterSpec(iv);
+			SecretKeySpec aliceAesKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
+			Cipher aliceCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+			aliceCipher.init(Cipher.DECRYPT_MODE, aliceAesKey, ivspec);
+
+			ServerSocket hmiServer = new ServerSocket(5555);
+			ServerSocket slaveServer = new ServerSocket(1234);
+
+			Socket hmiSocket = hmiServer.accept();
+			Socket slaveSocket = slaveServer.accept();
+
+			String bobMessage = "";
+			byte[] decodedHex;
+
+			// BufferedReader hmiIn = new BufferedReader(new InputStreamReader(hmiSocket.getInputStream()));
+			PrintWriter hmiOut = new PrintWriter(hmiSocket.getOutputStream(), true);
+			BufferedReader bobIn = new BufferedReader(new InputStreamReader(slaveSocket.getInputStream()));
+			// PrintWriter bobOut = new PrintWriter(slaveSocket.getOutputStream(), true);
+
+			while (true) {
+				
+				if ((bobMessage = bobIn.readLine()) != null){
+					decodedHex = hexToBytes(bobMessage);
+					byte[] recovered = aliceCipher.doFinal(decodedHex);
+					String recoveredString = new String(recovered, "UTF-8");
+					hmiOut.println(recoveredString);
+					// System.out.println("bob: " + bobMessage);
+				} else {
+					break;
+				}
+			}
+
+			hmiSocket.close();
+			slaveSocket.close();
+		} catch (Exception e){
+			System.out.println(e);
+		}
 	}
 	
 	public static void sendApc(byte[] sharedSecret){
@@ -32,10 +89,10 @@ public class AliceServer {
 			aliceCipher.init(Cipher.ENCRYPT_MODE, aliceAesKey, ivspec);
 
 			ServerSocket hmiServer = new ServerSocket(5555);
-			ServerSocket bobServer = new ServerSocket(1234);
+			ServerSocket slaveServer = new ServerSocket(1234);
 
 			Socket hmiSocket = hmiServer.accept();
-			Socket bobSocket = bobServer.accept();
+			Socket slaveSocket = slaveServer.accept();
 
 			String hmiMessage = "";
 			String bobMessage = "";
@@ -43,9 +100,9 @@ public class AliceServer {
 			String hexCipher = "";
 
 			BufferedReader hmiIn = new BufferedReader(new InputStreamReader(hmiSocket.getInputStream()));
-			PrintWriter hmiOut = new PrintWriter(hmiSocket.getOutputStream(), true);
-			BufferedReader bobIn = new BufferedReader(new InputStreamReader(bobSocket.getInputStream()));
-			PrintWriter bobOut = new PrintWriter(bobSocket.getOutputStream(), true);
+			// PrintWriter hmiOut = new PrintWriter(hmiSocket.getOutputStream(), true);
+			// BufferedReader bobIn = new BufferedReader(new InputStreamReader(slaveSocket.getInputStream()));
+			PrintWriter bobOut = new PrintWriter(slaveSocket.getOutputStream(), true);
 
 			while (true) {
 				/**
@@ -64,7 +121,7 @@ public class AliceServer {
 			}
 
 			hmiSocket.close();
-			bobSocket.close();
+			slaveSocket.close();
 		} catch (Exception e){
 			System.out.println(e);
 		}
@@ -89,9 +146,9 @@ public class AliceServer {
 			// Alice encodes her public key, and sends it over to Bob.
 			byte[] alicePubKeyEnc = aliceKpair.getPublic().getEncoded();
 
-			ServerSocket bobServer = new ServerSocket(1234);
+			ServerSocket slaveServer = new ServerSocket(1234);
 
-			Socket connectionSocket = bobServer.accept();
+			Socket connectionSocket = slaveServer.accept();
 
 			if (connectionSocket != null) {
 				System.out.println("Accepted Bob at " + connectionSocket.getInetAddress());
@@ -130,7 +187,7 @@ public class AliceServer {
 			 */
 			byte[] aliceSharedSecret = aliceKeyAgree.generateSecret();
 			
-			bobServer.close();
+			slaveServer.close();
 			return aliceSharedSecret;
 		} catch (Exception e) {
 			System.out.println("Error Generating Shared Secret");
@@ -173,5 +230,22 @@ public class AliceServer {
 	        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
 	    }
 	    return new String(hexChars);
+	}
+
+	public static byte[] hexToBytes(String s) {
+	    int len = s.length();
+	    byte[] data = new byte[len / 2];
+	    for (int i = 0; i < len; i += 2) {
+	        data[i / 2] = (byte) ((Character.digit(s.charAt(i), 16) << 4)
+	                             + Character.digit(s.charAt(i+1), 16));
+	    }
+	    return data;
+	}
+}
+
+public class HmiThread {
+	public static void main (String args[]){
+		HmiServer send = new HmiServer("HMI SEND");
+		send.start();
 	}
 }
