@@ -16,11 +16,15 @@ class HmiServer extends Thread{
 	private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
 	private Thread t;
 	private String threadName;
+	private Socket hmiSock;
+	private Socket slaveSock;
 	private byte[] sharedSecret;
 
-	HmiServer(String name, byte[] secret) {
+	HmiServer(String name, byte[] secret, Socket hmi, Socket slave) {
 		threadName = name;
 		sharedSecret = secret;
+		hmiSock = hmi;
+		slaveSock = slave;
 		System.out.println("Creating " + threadName);
 	}
 
@@ -28,7 +32,7 @@ class HmiServer extends Thread{
 		
 		if (threadName.equals("SEND")) {
 			System.out.println("This is send la");
-			sendApc(sharedSecret);
+			sendApc(sharedSecret, hmiSock, slaveSock);
 		} else if (threadName.equals("RECEIVE")){
 			System.out.println("THIS IS RECEIVE YAY");
 			receiveSlave(sharedSecret);
@@ -89,7 +93,7 @@ class HmiServer extends Thread{
 		}
 	}
 	
-	public static void sendApc(byte[] sharedSecret){
+	public static void sendApc(byte[] sharedSecret, Socket hmiSocket ,Socket slaveSocket){
 		try {
 			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     		IvParameterSpec ivspec = new IvParameterSpec(iv);
@@ -97,15 +101,13 @@ class HmiServer extends Thread{
 			Cipher aliceCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			aliceCipher.init(Cipher.ENCRYPT_MODE, aliceAesKey, ivspec);
 
-			ServerSocket hmiServer = new ServerSocket(5555);
-			ServerSocket slaveServer = new ServerSocket(1234);
+			// ServerSocket hmiServer = new ServerSocket(5555);
+			// ServerSocket slaveServer = new ServerSocket(1234);
 
-			Socket hmiSocket = hmiServer.accept();
-			Socket slaveSocket = slaveServer.accept();
+			// Socket hmiSocket = hmiServer.accept();
+			// Socket slaveSocket = slaveServer.accept();
 
 			String hmiMessage = "";
-			String bobMessage = "";
-
 			String hexCipher = "";
 
 			BufferedReader hmiIn = new BufferedReader(new InputStreamReader(hmiSocket.getInputStream()));
@@ -253,16 +255,17 @@ class HmiServer extends Thread{
 }
 
 public class HmiThread {
-	public static void main (String args[]){
-
+	public static void main (String args[]) throws Exception{
 		byte[] sharedSecret = generateKey();
 		System.out.println("Shared Secret: " + bytesToHex(sharedSecret));
 
-		HmiServer send = new HmiServer("SEND", sharedSecret);
+		Socket hmiSocket = initSecurePipe(5555);
+		Socket slaveSocket = initSecurePipe(1234);
+		HmiServer send = new HmiServer("SEND", sharedSecret, hmiSocket, slaveSocket);
 		send.start();
 
-		HmiServer receive = new HmiServer("RECEIVE", sharedSecret);
-		receive.start();
+		// HmiServer receive = new HmiServer("RECEIVE", sharedSecret);
+		// receive.start();
 	}
 
 	private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
@@ -342,6 +345,11 @@ public class HmiThread {
 			System.out.println("Error Generating Shared Secret");
 			return null;
 		}
-
 	}
+
+	private static Socket initSecurePipe(int port) throws Exception{
+		ServerSocket serversock = new ServerSocket(port);
+		return serversock.accept();
+	}
+
 }
