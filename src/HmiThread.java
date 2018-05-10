@@ -28,19 +28,14 @@ class HmiServer extends Thread{
 		System.out.println("Creating " + threadName);
 	}
 
-	public void run(){
-		
+	public void run(){	
 		if (threadName.equals("SEND")) {
 			System.out.println("This is send la");
 			sendApc(sharedSecret, hmiSock, slaveSock);
 		} else if (threadName.equals("RECEIVE")){
 			System.out.println("THIS IS RECEIVE YAY");
-			receiveSlave(sharedSecret);
+			receiveSlave(sharedSecret, hmiSock, slaveSock);
 		}
-		// byte[] sharedSecret = generateKey();
-		// System.out.println("Shared Secret: " + bytesToHex(sharedSecret));
-	
-		
 	}
 
 	public void start() {
@@ -51,19 +46,13 @@ class HmiServer extends Thread{
 		}
 	}
 
-	public static void receiveSlave(byte[] sharedSecret) {
+	public static void receiveSlave(byte[] sharedSecret, Socket hmiSocket ,Socket slaveSocket) {
 		try {
 			byte[] iv = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     		IvParameterSpec ivspec = new IvParameterSpec(iv);
 			SecretKeySpec aliceAesKey = new SecretKeySpec(sharedSecret, 0, 16, "AES");
 			Cipher aliceCipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
 			aliceCipher.init(Cipher.DECRYPT_MODE, aliceAesKey, ivspec);
-
-			ServerSocket hmiServer = new ServerSocket(5555);
-			ServerSocket slaveServer = new ServerSocket(1234);
-
-			Socket hmiSocket = hmiServer.accept();
-			Socket slaveSocket = slaveServer.accept();
 
 			String bobMessage = "";
 			byte[] decodedHex;
@@ -137,75 +126,6 @@ class HmiServer extends Thread{
 			System.out.println(e);
 		}
 	}
-	
-
-	// private static byte[] generateKey() {
-	// 	/*
-	// 	 * Alice creates her own DH key pair with 2048-bit key size
-	// 	 */
-	// 	try {
-	// 		//System.out.println("ALICE: Generate DH keypair ...");
-	// 		KeyPairGenerator aliceKpairGen = KeyPairGenerator.getInstance("DH");
-	// 		aliceKpairGen.initialize(2048);
-	// 		KeyPair aliceKpair = aliceKpairGen.generateKeyPair();
-
-	// 		// Alice creates and initializes her DH KeyAgreement object
-	// 		//System.out.println("ALICE: Initialization ...");
-	// 		KeyAgreement aliceKeyAgree = KeyAgreement.getInstance("DH");
-	// 		aliceKeyAgree.init(aliceKpair.getPrivate());
-
-	// 		// Alice encodes her public key, and sends it over to Bob.
-	// 		byte[] alicePubKeyEnc = aliceKpair.getPublic().getEncoded();
-
-	// 		ServerSocket slaveServer = new ServerSocket(1234);
-
-	// 		Socket connectionSocket = slaveServer.accept();
-
-	// 		if (connectionSocket != null) {
-	// 			System.out.println("Accepted Bob at " + connectionSocket.getInetAddress());
-	// 		}
-
-	// 		DataOutputStream out = new DataOutputStream(connectionSocket.getOutputStream());
-	// 		InputStream inStream = connectionSocket.getInputStream();
-	// 		byte[] dataBuffer = new byte[10000];
-
-	// 		//System.out.println("Sending over Alice's Public Key");
-	// 		out.write(alicePubKeyEnc);
-
-	// 		// Alice Recieves Bob's Public Key
-	// 		//System.out.println("Recieving Bob's Public Key");
-	// 		int count = inStream.read(dataBuffer);
-
-	// 		byte[] bobPubKeyEnc = new byte[count];
-
-	// 		for (int i = 0; i < bobPubKeyEnc.length; i++) {
-	// 			bobPubKeyEnc[i] = dataBuffer[i];
-	// 		}
-
-	// 		/*
-	// 		 * Alice uses Bob's public key for the first (and only) phase of her version of
-	// 		 * the DH protocol. Before she can do so, she has to instantiate a DH public key
-	// 		 * from Bob's encoded key material.
-	// 		 */
-	// 		KeyFactory aliceKeyFac = KeyFactory.getInstance("DH");
-	// 		X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(bobPubKeyEnc);
-	// 		PublicKey bobPubKey = aliceKeyFac.generatePublic(x509KeySpec);
-	// 		aliceKeyAgree.doPhase(bobPubKey, true);
-
-	// 		/*
-	// 		 * At this stage, both Alice and Bob have completed the DH key agreement
-	// 		 * protocol. Both generate the (same) shared secret.
-	// 		 */
-	// 		byte[] aliceSharedSecret = aliceKeyAgree.generateSecret();
-			
-	// 		slaveServer.close();
-	// 		return aliceSharedSecret;
-	// 	} catch (Exception e) {
-	// 		System.out.println("Error Generating Shared Secret");
-	// 		return null;
-	// 	}
-
-	// }
 
 	/*
 	 * Converts a byte to hex digit and writes to the supplied buffer
@@ -264,8 +184,13 @@ public class HmiThread {
 		HmiServer send = new HmiServer("SEND", sharedSecret, hmiSocket, slaveSocket);
 		send.start();
 
-		// HmiServer receive = new HmiServer("RECEIVE", sharedSecret);
-		// receive.start();
+		HmiServer receive = new HmiServer("RECEIVE", sharedSecret, hmiSocket, slaveSocket);
+		receive.start();
+	}
+
+	private static Socket initSecurePipe(int port) throws Exception{
+		ServerSocket serversock = new ServerSocket(port);
+		return serversock.accept();
 	}
 
 	private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
@@ -346,10 +271,4 @@ public class HmiThread {
 			return null;
 		}
 	}
-
-	private static Socket initSecurePipe(int port) throws Exception{
-		ServerSocket serversock = new ServerSocket(port);
-		return serversock.accept();
-	}
-
 }
