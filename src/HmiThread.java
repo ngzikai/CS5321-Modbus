@@ -99,12 +99,6 @@ class HmiServer extends Thread{
 			PrintWriter bobOut = new PrintWriter(slaveSocket.getOutputStream(), true);
 
 			while (true) {
-				/**
-				if ((bobMessage = bobIn.readLine()) != null){
-					hmiOut.println(bobMessage);
-					System.out.println("bob: " + bobMessage);
-				}
-				**/
 				if ((hmiMessage = hmiIn.readLine()) != null){
 					byte[] ciphertext = aliceCipher.doFinal(hmiMessage.getBytes());
 					hexCipher = bytesToHex(ciphertext); 

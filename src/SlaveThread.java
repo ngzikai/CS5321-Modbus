@@ -112,12 +112,6 @@ class SlaveServer extends Thread {
 					plcOut.println(recoveredString);
 
 				}
-				/**
-				else if ((plcMessage = plcIn.readLine()) != null){
-					aliceOut.println(plcMessage);
-					System.out.println("plc: " + plcMessage);
-				} 
-				**/
 				else {
 					break;
 				}
